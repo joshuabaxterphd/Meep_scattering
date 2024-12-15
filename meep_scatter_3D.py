@@ -2,7 +2,7 @@ import meep as mp
 import numpy as np
 import matplotlib.pyplot as plt
 from Mie_theory import Mie_Solver
-from meep.materials import Au
+from meep.materials import Ag
 
 Size_x = 2
 Size_y = 2
@@ -12,8 +12,9 @@ cell_size = mp.Vector3(Size_x,Size_y,Size_z)
 # # set up geometry (nanosphere)
 sphere_radius = 0.25
 sphere_refractive_index = 2
-# sphere_material = mp.Medium(index = sphere_refractive_index)
-sphere_material = Au
+sphere_material = mp.Medium(index = sphere_refractive_index)
+# sphere_material = Ag
+
 geometry = [mp.Sphere(material = sphere_material, center = mp.Vector3(), radius = sphere_radius)]
 
 # set up the source (plane wave)
@@ -65,11 +66,11 @@ box_pz = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(z=box_size/2),
 
 # visualize the simulation domain
 sim.plot2D(output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Size_x,Size_y)))
-plt.savefig("simXY.png")
+plt.savefig("simXY_empty.png")
 plt.close()
 
 sim.plot2D(output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Size_x,0,Size_z)))
-plt.savefig("simXZ.png")
+plt.savefig("simXZ_empty.png")
 plt.close()
 
 # run the simulation
@@ -134,7 +135,29 @@ sim.load_minus_flux_data(box_py, box_py_data_empty)
 sim.load_minus_flux_data(box_mz, box_mz_data_empty)
 sim.load_minus_flux_data(box_pz, box_pz_data_empty)
 
-sim.run(until_after_sources = mp.stop_when_fields_decayed(10, mp.Ez, mp.Vector3(0,box_size/2,0), 1e-4))
+# add movie monitors
+animate = mp.Animate2D(fields=mp.Ez,
+                       normalize = True,
+                       # field_parameters={'alpha':0.8, 'cmap':'RdBu', 'interpolation':'none'},
+                       # boundary_parameters={'hatch':'o', 'linewidth':1.5, 'facecolor':'y', 'edgecolor':'b', 'alpha':0.3},
+                       output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Size_x,Size_y)))
+
+
+# visualize the simulation domain
+sim.plot2D(output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Size_x,Size_y)))
+plt.savefig("simXY.png")
+plt.close()
+
+sim.plot2D(output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Size_x,0,Size_z)))
+plt.savefig("simXZ.png")
+plt.close()
+
+
+sim.run(mp.at_every(0.1,animate),until_after_sources = mp.stop_when_fields_decayed(10, mp.Ez, mp.Vector3(0,box_size/2,0), 1e-4))
+
+
+animate.to_mp4(fps = 10, filename = 'Nanosphere_Simulation.mp4')
+plt.close()
 
 for f in range(len(dft_freqs)):
     Ez_f = sim.get_dft_array(dft_fields,mp.Ez,f)
@@ -163,8 +186,9 @@ scatt_cross_section = scatt_flux / incident_intensity
 abs_cross_section = -abs_flux / incident_intensity
 
 mie_wavelengths = np.linspace(min_wavelength,max_wavelength,100)
-permittivities = np.array([Au.epsilon(1./wl) for wl in mie_wavelengths])
+permittivities = np.array([Ag.epsilon(1./wl) for wl in mie_wavelengths])
 sphere_refractive_index = np.sqrt(permittivities)[:,0,0]
+print(sphere_refractive_index)
 
 Q_sca, Q_abs, _ = Mie_Solver(Sphere_Radius = sphere_radius,
                                     Sphere_refractive_index = sphere_refractive_index,
