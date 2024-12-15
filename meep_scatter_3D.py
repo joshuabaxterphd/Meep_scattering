@@ -54,7 +54,7 @@ dft_fields = sim.add_dft_fields([mp.Ez],
                                 center = mp.Vector3(),
                                 size = mp.Vector3(Size_x,Size_y))
 
-
+# Flux box monitors
 box_size = sphere_radius * 4
 box_mx = sim.add_flux(frequencies, mp.FluxRegion(center = mp.Vector3(x = -box_size / 2), size = mp.Vector3(0,box_size,box_size)))
 box_px = sim.add_flux(frequencies, mp.FluxRegion(center = mp.Vector3(x = box_size / 2), size = mp.Vector3(0,box_size,box_size)))
@@ -73,7 +73,7 @@ sim.plot2D(output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Siz
 plt.savefig("simXZ_empty.png")
 plt.close()
 
-# run the simulation
+# run the empty-domain simulation
 # sim.run(until_after_sources = 10)
 sim.run(until_after_sources = mp.stop_when_fields_decayed(10, mp.Ez, mp.Vector3(0,box_size/2,0), 1e-4))
 
@@ -84,6 +84,7 @@ for f in range(len(dft_freqs)):
     plt.savefig(f"Ez_f_{1./dft_freqs[f]}.png")
     plt.close()
 
+# Store flux monitor data for empty simulation
 box_mx_data_empty = sim.get_flux_data(box_mx)
 box_px_data_empty = sim.get_flux_data(box_px)
 box_my_data_empty = sim.get_flux_data(box_my)
@@ -91,11 +92,13 @@ box_py_data_empty = sim.get_flux_data(box_py)
 box_mz_data_empty = sim.get_flux_data(box_mz)
 box_pz_data_empty = sim.get_flux_data(box_pz)
 
-incident_intensity = np.array(mp.get_fluxes(box_my)) / (box_size ** 2)
+incident_intensity = np.array(mp.get_fluxes(box_my)) / (box_size ** 2) # calculate incident intensity for normalization later
+
 plt.plot(wavelengths,incident_intensity)
 plt.savefig('Inc_Intensity.png')
 plt.close()
 
+# Re-setup simulation but with the scatterer this time
 sim.reset_meep()
 
 sim = mp.Simulation(resolution = resolution,
@@ -105,14 +108,14 @@ sim = mp.Simulation(resolution = resolution,
                     geometry = geometry,
                     Courant = 0.3)
 
-
+# DFT Monitor
 dft_freqs = [1./min_wavelength, center_freq, 1./max_wavelength]
 dft_fields = sim.add_dft_fields([mp.Ez],
                                 dft_freqs,
                                 center = mp.Vector3(),
                                 size = mp.Vector3(Size_x,Size_y))
 
-
+# Scattering flux monitors
 box_mx = sim.add_flux(frequencies, mp.FluxRegion(center = mp.Vector3(x = -box_size / 2), size = mp.Vector3(0,box_size,box_size)))
 box_px = sim.add_flux(frequencies, mp.FluxRegion(center = mp.Vector3(x = box_size / 2), size = mp.Vector3(0,box_size,box_size)))
 box_my = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(y=-box_size/2),size=mp.Vector3(x = box_size, z = box_size)))
@@ -120,6 +123,7 @@ box_py = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(y=box_size/2),
 box_mz = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(z=-box_size/2),size=mp.Vector3(x = box_size, y = box_size)))
 box_pz = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(z=box_size/2),size=mp.Vector3(x = box_size, y = box_size)))
 
+# Absorption flux monitors
 box_mx_abs = sim.add_flux(frequencies, mp.FluxRegion(center = mp.Vector3(x = -box_size / 2), size = mp.Vector3(0,box_size,box_size)))
 box_px_abs = sim.add_flux(frequencies, mp.FluxRegion(center = mp.Vector3(x = box_size / 2), size = mp.Vector3(0,box_size,box_size)))
 box_my_abs = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(y=-box_size/2),size=mp.Vector3(x = box_size, z = box_size)))
@@ -127,7 +131,7 @@ box_py_abs = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(y=box_size
 box_mz_abs = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(z=-box_size/2),size=mp.Vector3(x = box_size, y = box_size)))
 box_pz_abs = sim.add_flux(frequencies,mp.FluxRegion(center=mp.Vector3(z=box_size/2),size=mp.Vector3(x = box_size, y = box_size)))
 
-
+# Load empty-domain simulation data into scattering monitor
 sim.load_minus_flux_data(box_mx, box_mx_data_empty)
 sim.load_minus_flux_data(box_px, box_px_data_empty)
 sim.load_minus_flux_data(box_my, box_my_data_empty)
@@ -152,26 +156,28 @@ sim.plot2D(output_plane = mp.Volume(center = mp.Vector3(), size = mp.Vector3(Siz
 plt.savefig("simXZ.png")
 plt.close()
 
-
+# Run simulation with scatterer + movie monitor
 sim.run(mp.at_every(0.1,animate),until_after_sources = mp.stop_when_fields_decayed(10, mp.Ez, mp.Vector3(0,box_size/2,0), 1e-4))
 
-
+# Create movie - requires ffmpeg
 animate.to_mp4(fps = 10, filename = 'Nanosphere_Simulation.mp4')
 plt.close()
 
+# Plot Fourier Transform fields
 for f in range(len(dft_freqs)):
     Ez_f = sim.get_dft_array(dft_fields,mp.Ez,f)
     plt.imshow(np.real(Ez_f),extent = [-Size_y/2, Size_y/2, -Size_x/2, Size_x/2])
     plt.savefig(f"Ez_f_{1./dft_freqs[f]}.png")
     plt.close()
 
+# get scattering fluxes
 box_mx_flux = np.array(mp.get_fluxes(box_mx))
 box_px_flux = np.array(mp.get_fluxes(box_px))
 box_my_flux = np.array(mp.get_fluxes(box_my))
 box_py_flux = np.array(mp.get_fluxes(box_py))
 box_pz_flux = np.array(mp.get_fluxes(box_pz))
 box_mz_flux = np.array(mp.get_fluxes(box_mz))
-
+# get absorption fluxes
 box_mx_flux_abs = np.array(mp.get_fluxes(box_mx_abs))
 box_px_flux_abs = np.array(mp.get_fluxes(box_px_abs))
 box_my_flux_abs = np.array(mp.get_fluxes(box_my_abs))
@@ -179,6 +185,7 @@ box_py_flux_abs = np.array(mp.get_fluxes(box_py_abs))
 box_pz_flux_abs = np.array(mp.get_fluxes(box_pz_abs))
 box_mz_flux_abs = np.array(mp.get_fluxes(box_mz_abs))
 
+# Calculate scattering cross-section data and compare with Mie theory
 scatt_flux = -box_mx_flux + box_px_flux -box_my_flux + box_py_flux -box_mz_flux + box_pz_flux
 abs_flux = -box_mx_flux_abs + box_px_flux_abs -box_my_flux_abs + box_py_flux_abs -box_mz_flux_abs + box_pz_flux_abs
 
